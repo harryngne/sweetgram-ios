@@ -87,6 +87,7 @@ app_group.new_reference('App.entitlements') unless app_group.files.any? { |x| x.
 common = lambda do |t, bundle, entfile|
   t.build_configurations.each do |c|
     b = c.build_settings
+    b['PRODUCT_NAME'] = '$(TARGET_NAME)'          # tránh lỗi "Multiple commands produce '.appex'" khi build không ký
     b['PRODUCT_BUNDLE_IDENTIFIER'] = bundle
     b['CODE_SIGN_ENTITLEMENTS'] = entfile
     b['CODE_SIGN_STYLE'] = 'Automatic'
