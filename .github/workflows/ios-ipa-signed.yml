@@ -1,0 +1,74 @@
+# Xuất file .IPA ĐÃ KÝ (tài khoản Apple Developer trả phí) để tự cài / sideload — KHÔNG qua TestFlight.
+# IPA ký thật dùng được tới khi chứng chỉ hết hạn (~1 năm), không bị giới hạn 7 ngày như Apple ID miễn phí.
+# Cần 4 secrets giống Cách A: APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8  (xem README-iOS.md).
+# TRƯỚC KHI CHẠY: đăng ký UDID của iPhone sẽ cài — developer.apple.com → Devices → ➕ (lấy UDID bằng Finder/iMazing).
+name: iOS IPA (đã ký)
+on:
+  workflow_dispatch:
+    inputs:
+      method:
+        description: "Kiểu xuất: development (máy đã đăng ký UDID) hoặc ad-hoc (tối đa 100 máy)"
+        type: choice
+        default: development
+        options: [development, ad-hoc]
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      SWEETGRAM_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      SWEETGRAM_BUILD: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Chọn Xcode
+        run: bash scripts/pick-xcode.sh
+      - name: Tạo dự án Xcode
+        run: |
+          npm ci
+          gem install xcodeproj --no-document
+          node scripts/prepare.mjs
+          npx cap add ios
+          npx cap sync ios
+          ruby scripts/setup-ios.rb
+      - name: Khoá App Store Connect
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "${{ secrets.ASC_KEY_P8 }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
+      - name: Archive (ký tự động)
+        run: |
+          set -o pipefail
+          K=~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath build/Sweetgram.xcarchive \
+            -allowProvisioningUpdates -authenticationKeyPath "$K" \
+            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" archive | tail -50
+      - name: Xuất .ipa
+        run: |
+          K=~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
+          M="${{ github.event.inputs.method }}"; [ -z "$M" ] && M=development
+          cat > build/ExportOptions.plist <<PL
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>$M</string>
+            <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>stripSwiftSymbols</key><true/>
+            <key>compileBitcode</key><false/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict></plist>
+          PL
+          xcodebuild -exportArchive -archivePath build/Sweetgram.xcarchive -exportPath build/out \
+            -exportOptionsPlist build/ExportOptions.plist -allowProvisioningUpdates \
+            -authenticationKeyPath "$K" -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
+          ls -la build/out
+      - name: Tải lên artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sweetgram-ipa-signed
+          path: build/out/*.ipa
+          if-no-files-found: error

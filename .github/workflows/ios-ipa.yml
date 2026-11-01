@@ -1,0 +1,54 @@
+# Build file .IPA CHƯA KÝ để sideload (AltStore / Sideloadly / TrollStore).
+# KHÔNG cần tài khoản Apple Developer, KHÔNG cần secrets — chạy trên máy Mac miễn phí của GitHub.
+# Dùng: tab Actions → "iOS IPA (sideload)" → Run workflow → đợi ~15–25 phút → tải artifact "Sweetgram-ipa".
+name: iOS IPA (sideload)
+on:
+  workflow_dispatch:
+  push:
+    tags: ['ipa-*']
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Chọn Xcode
+        run: bash scripts/pick-xcode.sh
+      - name: Tạo dự án Xcode (tắt thông báo đẩy để sideload bằng Apple ID thường)
+        run: |
+          npm ci
+          gem install xcodeproj --no-document
+          node scripts/prepare.mjs
+          npx cap add ios
+          npx cap sync ios
+          SWEETGRAM_PUSH=0 ruby scripts/setup-ios.rb
+      - name: Build (không ký)
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build/dd \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES ENABLE_BITCODE=NO \
+            build | tail -60
+      - name: Đóng gói .ipa (chưa ký)
+        run: |
+          APP=$(find build/dd/Build/Products -maxdepth 2 -name 'App.app' -type d | head -1)
+          [ -z "$APP" ] && APP=$(find build/dd/Build/Products -maxdepth 2 -name '*.app' -type d | head -1)
+          echo "App đã build: $APP"
+          [ -z "$APP" ] && { echo "Không tìm thấy .app"; exit 1; }
+          rm -rf build/Payload && mkdir -p build/Payload
+          cp -R "$APP" build/Payload/
+          (cd build && zip -qry Sweetgram-unsigned.ipa Payload)
+          ls -la build/*.ipa
+      - name: Tải lên artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sweetgram-ipa
+          path: build/Sweetgram-unsigned.ipa
+          if-no-files-found: error
+      - name: Lưu nhật ký nếu lỗi
+        if: failure()
+        run: |
+          echo "Xem log ở trên. Gửi 60 dòng cuối cho người hỗ trợ nếu build lỗi."

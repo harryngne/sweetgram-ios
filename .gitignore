@@ -1,0 +1,7 @@
+node_modules/
+ios/
+build/
+scripts/.resolved.json
+capacitor.config.json
+www/config.js
+*.p8

@@ -1,0 +1,62 @@
+# Build app iPhone Sweetgram trên máy Mac của GitHub (không cần có Mac) rồi đẩy lên TestFlight.
+# Cần 4 "secrets" (Settings → Secrets and variables → Actions) — xem README-iOS.md:
+#   APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (nội dung file AuthKey_XXXX.p8)
+name: iOS
+on:
+  workflow_dispatch:
+  push:
+    tags: ['ios-*']
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      SWEETGRAM_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      SWEETGRAM_BUILD: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Chọn Xcode
+        run: bash scripts/pick-xcode.sh
+      - name: Tạo dự án Xcode
+        run: |
+          npm ci
+          gem install xcodeproj --no-document
+          node scripts/prepare.mjs
+          npx cap add ios
+          npx cap sync ios
+          ruby scripts/setup-ios.rb
+      - name: Khoá App Store Connect
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "${{ secrets.ASC_KEY_P8 }}" > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
+      - name: Build + ký (tự tạo App ID, App Group, chứng chỉ)
+        run: |
+          K=~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath build/Sweetgram.xcarchive \
+            -allowProvisioningUpdates -authenticationKeyPath "$K" \
+            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" archive | tail -40
+      - name: Đẩy lên TestFlight
+        run: |
+          K=~/.appstoreconnect/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
+          cat > build/ExportOptions.plist <<PL
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict></plist>
+          PL
+          xcodebuild -exportArchive -archivePath build/Sweetgram.xcarchive -exportPath build/out \
+            -exportOptionsPlist build/ExportOptions.plist -allowProvisioningUpdates -authenticationKeyPath "$K" \
+            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
+      - name: Lưu nhật ký build nếu lỗi
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with: { name: build-logs, path: ~/Library/Logs/DiagnosticReports, if-no-files-found: ignore }
