@@ -14,7 +14,14 @@ writeFileSync('capacitor.config.json', JSON.stringify({
   appId: c.appId,
   appName: c.name,
   webDir: 'www',
-  server: { url: c.url.replace(/\/?$/, '/'), allowNavigation: [host, 'www.paypal.com', '*.paypal.com', '*.paypalobjects.com'], errorPath: 'offline.html' },
+  server: { url: c.url.replace(/\/?$/, '/'), allowNavigation: [
+    host,
+    'www.paypal.com', '*.paypal.com', '*.paypalobjects.com',
+    // YouTube "Xem chung": cho phép WebView nạp script IFrame API, khung nhúng và luồng video
+    'www.youtube.com', '*.youtube.com', 'youtube-nocookie.com', 'www.youtube-nocookie.com',
+    's.ytimg.com', 'i.ytimg.com', '*.ytimg.com', '*.googlevideo.com',
+    'www.google.com', '*.gstatic.com', '*.ggpht.com',
+  ], errorPath: 'offline.html' },
   ios: { contentInset: 'never', limitsNavigationsToAppBoundDomains: false, backgroundColor: '#b86cff', scheme: 'Sweetgram' },
   plugins: { PushNotifications: { presentationOptions: ['badge', 'sound', 'alert'] } },
 }, null, 2))
