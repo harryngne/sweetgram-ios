@@ -15,7 +15,7 @@ writeFileSync('capacitor.config.json', JSON.stringify({
   appName: c.name,
   webDir: 'www',
   server: { url: c.url.replace(/\/?$/, '/'), allowNavigation: [host, 'www.paypal.com', '*.paypal.com', '*.paypalobjects.com'], errorPath: 'offline.html' },
-  ios: { contentInset: 'never', limitsNavigationsToAppBoundDomains: false, backgroundColor: '#ffffff', scheme: 'Sweetgram' },
+  ios: { contentInset: 'never', limitsNavigationsToAppBoundDomains: false, backgroundColor: '#b86cff', scheme: 'Sweetgram' },
   plugins: { PushNotifications: { presentationOptions: ['badge', 'sound', 'alert'] } },
 }, null, 2))
 writeFileSync('www/config.js', `window.SG_URL = ${JSON.stringify(c.url.replace(/\/?$/, '/'))}\n`)

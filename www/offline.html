@@ -1,5 +1,41 @@
-<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Sweetgram</title>
-<body style="margin:0;display:grid;place-items:center;height:100vh;font:16px -apple-system,system-ui;color:#333;text-align:center;padding:24px">
-<div><div style="font-size:56px">💌</div><h2 style="margin:8px 0">Không kết nối được</h2><p style="color:#777">Kiểm tra mạng rồi thử lại nhé.</p>
-<button onclick="location.href=window.SG_URL||'/'" style="margin-top:12px;padding:12px 22px;border:0;border-radius:12px;background:#0095f6;color:#fff;font-size:16px;font-weight:600">Thử lại</button></div>
+<!doctype html><html lang="vi"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>Sweetgram</title>
+<style>
+  :root{color-scheme:light dark}
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;
+    padding:max(24px,env(safe-area-inset-top)) 28px max(24px,env(safe-area-inset-bottom));
+    font:16px -apple-system,system-ui,"Segoe UI",sans-serif;color:#fff;
+    background:linear-gradient(165deg,#ff6aa0,#b86cff 65%,#9a53e0)}
+  .logo{width:84px;height:84px;border-radius:22px;box-shadow:0 14px 44px rgba(90,20,120,.35);animation:pop .6s cubic-bezier(.2,.8,.3,1)}
+  h2{margin:4px 0 0;font-size:22px;font-weight:600;letter-spacing:.2px}
+  p{margin:0;max-width:300px;color:rgba(255,255,255,.88);line-height:1.5}
+  button{margin-top:6px;padding:13px 26px;border:0;border-radius:14px;background:#fff;color:#9a53e0;
+    font-size:16px;font-weight:700;letter-spacing:.2px;box-shadow:0 8px 24px rgba(0,0,0,.18);cursor:pointer}
+  button:active{transform:scale(.97)}
+  .dots{display:inline-block;min-width:18px;text-align:left}
+  @keyframes pop{from{transform:scale(.82);opacity:.2}to{transform:scale(1);opacity:1}}
+  @media(prefers-reduced-motion:reduce){.logo{animation:none}}
+</style></head>
+<body>
+  <img class="logo" src="icons/icon-192.png" alt="" onerror="this.style.display='none'">
+  <h2>Mất kết nối rồi 💌</h2>
+  <p id="msg">Kiểm tra mạng (Wi‑Fi / 4G) rồi thử lại nhé. Mình sẽ tự vào lại ngay khi có mạng.</p>
+  <button id="retry" onclick="go()">Thử lại</button>
 <script src="config.js"></script>
+<script>
+  function go(){ var b=document.getElementById('retry'); b.disabled=true; b.textContent='Đang vào…';
+    location.href = (window.SG_URL||'/'); }
+  // Tự thử lại khi thiết bị báo đã có mạng
+  window.addEventListener('online', go);
+  // Kiểm tra nền mỗi 4s: nếu máy chủ phản hồi thì vào lại
+  setInterval(function(){
+    if(!navigator.onLine) return;
+    var u=(window.SG_URL||'/');
+    fetch(u, {method:'HEAD', mode:'no-cors', cache:'no-store'}).then(go).catch(function(){});
+  }, 4000);
+</script>
+</body></html>
